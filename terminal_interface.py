@@ -33,6 +33,8 @@ def load_model_from_path(path):
     return mod.model
 
 class CLI:
+    success = False # Flag used to stop the interface if a level was mastered
+
     def __init__(self, level):
         self.level = level
         self.history = [self.level.position.copy()] # list of numpy positions
@@ -40,6 +42,9 @@ class CLI:
     def start(self):
         print("Simple terminal interface for foundation-of-science-game")
         print("type 'help' for commands")
+        print()
+        print("This levels description:")
+        print(self.level.description())
         while True:
             try:
                 line = input("> ").strip()
@@ -57,6 +62,8 @@ class CLI:
             if handler:
                 try:
                     handler(args)
+                    if self.success == True:
+                        break
                 except Exception as e:
                     print("error:", e)
             else:
@@ -74,6 +81,7 @@ class CLI:
                          and run level.check(model)
   help                 - show this message
   exit | quit          - quit""")
+        print(self.level.description())
 
     def cmd_move(self, args):
         if not args:
@@ -85,8 +93,8 @@ class CLI:
             parts = [p.strip() for p in vec_str.split(",") if p.strip()]
         else:
             parts = vec_str.split()
-        if len(parts) != self.level.dim:
-            print(f"expected {self.level.dim} values, got {len(parts)}")
+        if len(parts) != self.level.dim_move:
+            print(f"expected {self.level.dim_move} values, got {len(parts)}")
             return
         try:
             vec = np.array([float(p) for p in parts])
@@ -187,6 +195,7 @@ class CLI:
             print("error running check:", e)
             return
         print("model check result:", ok)
+        self.success = ok
 
 if __name__ == "__main__":
     cli = CLI(gb.Euclidean())

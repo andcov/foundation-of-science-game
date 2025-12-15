@@ -49,6 +49,7 @@ class Level():
 class Euclidean(Level):
     def __init__(self, dim: int = 3):
         self.dim = dim
+        self.dim_move = dim
         self.position = np.zeros(dim)
     
     def description(self):
@@ -64,7 +65,7 @@ class Euclidean(Level):
     def save_point(self, name: str):
         self.known_points[name] = self.position.copy()
 
-    def measure_angle(self, left_point: str, right_point: str) -> int: # measuring the angle between two points and the current position
+    def measure_angle(self, left_point: str, right_point: str) -> int: # measuring the angle (in rad) between two points and the current position
         a = self.known_points[left_point] - self.position
         b = self.known_points[right_point] - self.position
         return angle_between(a, b)
@@ -80,3 +81,268 @@ class Euclidean(Level):
                 return False
         return True
 
+
+class Elevator(Euclidean):
+    dim_move = 2
+    def __init__(self):
+        super().__init__()
+        self.known_points["check me out"] = np.array([1,2,0])
+    
+    def description(self):
+        return """This level takes 2 dimensions as a movementvector and
+        expects the model to take a 3 dimensional position and a 2 dimensional movement_vector
+        it should return a 3 dimensional list with the predicted new position
+        
+        so model should have type model(position: List(int), movement: List(int)) -> List(int)"""
+    
+    def move(self, movement_vector: np.array):
+        self.position += np.append(movement_vector, 0)
+        if np.all(self.position == self.known_points["check me out"]):
+            self.position += np.array([0,0,1])
+        elif list(self.position) == list(self.known_points["check me out"]+np.array([0,0,1])):
+            self.position -= np.array([0,0,1])
+    
+    def check(self, model):
+        save_position = self.position
+
+        for i in range(100):
+            pos = np.random.randint(-1000, 1000, 3)
+            self.position = pos.copy()
+            move = np.random.randint(-1000, 1000, 2)
+            self.move(move)
+            if nparr_to_list(self.position) != model(nparr_to_list(pos), nparr_to_list(move)):
+                self.position = save_position
+                return False
+        
+        for i in range(30):
+            pos = np.random.randint(-10, 10, 3)
+            self.position = pos.copy()
+            move = np.random.randint(-10, 10, 2)
+            self.move(move)
+            if nparr_to_list(self.position) != model(nparr_to_list(pos), nparr_to_list(move)):
+                self.position = save_position
+                return False
+        
+        pos = [30, 20, 1]
+        self.position = pos.copy()
+        move = [-29, -28]
+        self.move(move)
+        if nparr_to_list(self.position) != model(nparr_to_list(pos), nparr_to_list(move)):
+            self.position = save_position
+            return False
+        
+        pos = [30, 20, 0]
+        self.position = pos.copy()
+        move = [-29, -28]
+        self.move(move)
+        if nparr_to_list(self.position) != model(nparr_to_list(pos), nparr_to_list(move)):
+            self.position = save_position
+            return False
+        
+        # TODO can not test position at "check me out" and move 0 as this is not testable for user
+        # TODO wrong, they can stand still on that spot, but maybe hard to guess
+
+        self.position = save_position
+        return True
+      
+
+class SimpleTime(Euclidean):
+    dim_move = 2
+    def __init__(self):
+        super().__init__()
+    
+    def description(self):
+        return """This level takes 2 dimensions as a movementvector and
+        expects the model to take a 3 dimensional position and a 2 dimensional movement_vector
+        it should return a 3 dimensional list with the predicted new position
+        
+        so model should have type model(position: List(int), movement: List(int)) -> List(int)"""
+    
+    def move(self, movement_vector: np.array):
+        self.position += np.append(movement_vector, round(np.sqrt(movement_vector[0]**2+movement_vector[1]**2)))
+    
+    def check(self, model):
+        save_position = self.position
+
+        for i in range(100):
+            pos = np.random.randint(-1000, 1000, 3)
+            self.position = pos.copy()
+            move = np.random.randint(-1000, 1000, 2)
+            self.move(move)
+            if nparr_to_list(self.position) != model(nparr_to_list(pos), nparr_to_list(move)):
+                self.position = save_position
+                return False
+        
+        for i in range(30):
+            pos = np.random.randint(-10, 10, 3)
+            self.position = pos.copy()
+            move = np.random.randint(-10, 10, 2)
+            self.move(move)
+            if nparr_to_list(self.position) != model(nparr_to_list(pos), nparr_to_list(move)):
+                self.position = save_position
+                return False
+        self.position = save_position
+        return True
+
+
+
+
+# As you can see: AI generated
+
+class Spherical(Level):
+    """
+    A level where the player moves on a closed surface.  The implementation
+    works with 3‑dimensional spherical coordinates (θ, φ, r) internally, but the
+    description does **not** reveal the geometry.
+    """
+    position = [0,0]
+
+    # ------------------------------------------------------------------ #
+    # Construction – fixed to a 3‑D sphere (dim = 3)
+    # ------------------------------------------------------------------ #
+    def __init__(self, radius: float = 1.0):
+        if radius <= 0:
+            raise ValueError("radius must be > 0")
+        self.r = float(radius)
+
+        # start at (θ=0, φ=π/2) → point on the equator, x = r
+        self.position[0] = 0.0                 # azimuth  ∈ [0, 2π)
+        self.position[1] = np.pi / 2.0           # polar    ∈ [0, π]
+
+        self.known_points = {}
+
+    # ------------------------------------------------------------------ #
+    # Helpers – conversion between spherical and Cartesian
+    # ------------------------------------------------------------------ #
+    def _cartesian(self, theta: float, phi: float) -> np.ndarray:
+        """Cartesian coordinates of the current radius‑r point."""
+        return self.r * np.array([
+            np.sin(phi) * np.cos(theta),
+            np.sin(phi) * np.sin(theta),
+            np.cos(phi)
+        ])
+
+    def _normalize_angles(self):
+        """Wrap θ to [0,2π) and keep φ inside [0,π] (reflect at the poles)."""
+        self.position[0] = self.position[0] % (2 * np.pi)
+
+        # reflect φ when it leaves the [0,π] interval
+        while self.position[1] < 0 or self.position[1] > np.pi:
+            if self.position[1] < 0:
+                self.position[1] = -self.position[1]
+                self.position[0] += np.pi          # crossing the south pole flips azimuth
+            elif self.position[1] > np.pi:
+                self.position[1] = 2 * np.pi - self.position[1]
+                self.position[0] += np.pi          # crossing the north pole flips azimuth
+        self._normalize_angles() if (self.position[1] < 0 or self.position[1] > np.pi) else None
+
+    # ------------------------------------------------------------------ #
+    # Public API required by the framework
+    # ------------------------------------------------------------------ #
+    def description(self):
+        return (
+            "This level takes a 3‑dimensional position and a 2‑dimensional movement "
+            "vector, updates the position, and lets you save/measure points."
+        )
+
+    def move(self, movement_coords: np.ndarray):
+        """
+        `movement_coords` is a length‑2 array:  [Δθ, Δφ]  (radians).
+        The method adds the deltas to the current angles and normalises them,
+        guaranteeing that the player stays on the same surface.
+        """
+        if movement_coords.shape != (2,):
+            raise ValueError("movement vector must have shape (2,) for a 3‑D sphere")
+
+        dtheta, dphi = movement_coords
+        self.position[0] += dtheta
+        self.position[1]   += dphi
+        self._normalize_angles()
+
+    def save_point(self, name: str):
+        """Remember the current spherical coordinates under `name`."""
+        self.known_points[name] = (self.position[0], self.position[1])
+
+    def measure_angle(self, left_point: str, right_point: str) -> float:
+        """
+        Returns the angle (in radians) between the two saved points as seen from
+        the current position – i.e. the spherical angle at the current vertex of
+        the triangle formed by the three points.
+        """
+        # convert everything to Cartesian vectors that start at the centre
+        cur   = self._cartesian(self.position[0], self.position[1])
+        left  = self._cartesian(*self.known_points[left_point])
+        right = self._cartesian(*self.known_points[right_point])
+
+        # vectors from the current point to the two saved points
+        a = left - cur
+        b = right - cur
+
+        # angle between the two tangent vectors
+        dot = np.dot(a, b)
+        norm_a, norm_b = np.linalg.norm(a), np.linalg.norm(b)
+        if norm_a == 0 or norm_b == 0:
+            raise ValueError("saved point coincides with current position")
+        cos_angle = np.clip(dot / (norm_a * norm_b), -1.0, 1.0)
+        return np.arccos(cos_angle)
+
+    def measure_length(self, other_point: str) -> float:
+        """
+        Returns the great‑circle distance between the current position and a
+        saved point:  r · Δσ, where Δσ is the central angle between the two radius
+        vectors.
+        """
+        cur  = self._cartesian(self.position[0], self.position[1])
+        oth  = self._cartesian(*self.known_points[other_point])
+        dot  = np.dot(cur, oth)
+        cos_sigma = np.clip(dot / (self.r ** 2), -1.0, 1.0)
+        sigma = np.arccos(cos_sigma)
+        return self.r * sigma
+
+    def check(self, model):
+        """
+        Randomly generate 100 positions (θ, φ) and movement vectors (Δθ, Δφ).
+        For each trial:
+          1. Build the position list   → [θ, φ, r]
+          2. Build the movement list   → [Δθ, Δφ]
+          3. Compute the expected new spherical coordinates
+             using the same logic as `move`.
+          4. Call the model and verify:
+                * it returns a list of length 3,
+                * the radius component equals `self.r` (within tolerance),
+                * the returned angles match the expected ones (tolerance 1e‑5).
+        """
+        for _ in range(100):
+            # ----- random position -----
+            theta = np.random.uniform(0, 2 * np.pi)
+            phi   = np.random.uniform(0, np.pi)
+            pos_list = [theta, phi, self.r]
+
+            # ----- random movement (Δθ, Δφ) -----
+            dtheta = np.random.uniform(-np.pi, np.pi)          # up to half‑circumference
+            dphi   = np.random.uniform(-np.pi / 2, np.pi / 2)   # avoid jumping over both poles at once
+            mov_list = [dtheta, dphi]
+
+            # ----- expected new state -----
+            # copy current angles so the level isn’t polluted for the next loop
+            self.position[0], self.position[1] = theta, phi
+            self.move(np.array([dtheta, dphi]))
+            expected = [self.position[0], self.position[1], self.r]
+
+            # ----- model output -----
+            try:
+                out = model(pos_list, mov_list)
+            except Exception:
+                return False
+
+            # ----- validation -----
+            if not isinstance(out, (list, tuple)) or len(out) != 3:
+                return False
+            out_theta, out_phi, out_r = out
+            if not np.isclose(out_r, self.r, atol=1e-5):
+                return False
+            if not np.isclose(out_theta % (2*np.pi), expected[0] % (2*np.pi), atol=1e-5):
+                return False
+            if not np.isclose(out_phi, expected[1], atol=1e-5):
+                return False
+        return True

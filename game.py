@@ -35,5 +35,5 @@ cli = CLI(Spherical)
 cli.start()
 
 # Non determinism Level
-# cli = CLI(NonUniqueODE())
-# cli.start()
+cli = CLI(NonUniqueODE())
+cli.start()
